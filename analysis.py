@@ -15,15 +15,15 @@ def rocstories(data_dir, pred_path, log_path):
     logs = [json.loads(line) for line in open(log_path)][1:]
     best_validation_index = np.argmax([log['va_acc'] for log in logs])
     valid_accuracy = logs[best_validation_index]['va_acc']
-    print('ROCStories Valid Accuracy: %.2f' % (valid_accuracy))
-    print('ROCStories Test Accuracy:  %.2f' % (test_accuracy))
+    print('rocstories valid accuracy: %.2f' % (valid_accuracy))
+    print('rocstories test accuracy:  %.2f' % (test_accuracy))
 
 
-def sst2(labels, pred_path, log_path):
+def classification(dataset, labels, pred_path, log_path):
     preds = pd.read_csv(pred_path, delimiter='\t')['prediction'].values.tolist()
     test_accuracy = accuracy_score(labels, preds) * 100.
     logs = [json.loads(line) for line in open(log_path)][1:]
     best_validation_index = np.argmax([log['va_acc'] for log in logs])
     valid_accuracy = logs[best_validation_index]['va_acc']
-    print('SST2 Valid Accuracy: %.2f' % (valid_accuracy))
-    print('SST2 Test Accuracy:  %.2f' % (test_accuracy))
+    print('%s valid accuracy: %.2f' % (dataset, valid_accuracy))
+    print('%s test accuracy:  %.2f' % (dataset, test_accuracy))

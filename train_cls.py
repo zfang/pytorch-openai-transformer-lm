@@ -8,7 +8,7 @@ import torch.nn as nn
 from sklearn.metrics import accuracy_score
 from sklearn.utils import shuffle
 
-from analysis import rocstories as rocstories_analysis
+from analysis import classification
 from datasets import sst2
 from loss import ClassificationLossCompute
 from model_pytorch import DoubleHeadModel, load_openai_pretrained_model
@@ -195,7 +195,16 @@ if __name__ == '__main__':
     if submit:
         path = os.path.join(save_dir, desc, 'best_params')
         dh_model.load_state_dict(torch.load(path))
-        predict(teX, teM, args.submission_dir, '{}.tsv'.format(dataset), argmax, None)
+        predict(X=teX,
+                submission_dir=args.submission_dir,
+                filename='{}.tsv'.format(dataset),
+                pred_fn=argmax,
+                label_decoder=None,
+                dh_model=dh_model,
+                n_batch_train=n_batch_train,
+                device=device)
         if args.analysis:
-            rocstories_analysis(data_dir, os.path.join(args.submission_dir, '{}.tsv'.format(dataset)),
-                                os.path.join(log_dir, '{}.jsonl'.format(dataset)))
+            classification(dataset,
+                           teY,
+                           os.path.join(args.submission_dir, '{}.tsv'.format(dataset)),
+                           os.path.join(log_dir, '{}.jsonl'.format(dataset)))

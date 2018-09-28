@@ -51,8 +51,8 @@ def iter_predict(Xs, dh_model, n_batch_train, device):
     return logits
 
 
-def predict(X, M, submission_dir, filename, pred_fn, label_decoder):
-    predictions = pred_fn(iter_predict(X, M))
+def predict(X, submission_dir, filename, pred_fn, label_decoder, dh_model, n_batch_train, device):
+    predictions = pred_fn(iter_predict(X, dh_model, n_batch_train, device))
     if label_decoder is not None:
         predictions = [label_decoder[prediction] for prediction in predictions]
     path = os.path.join(submission_dir, filename)
