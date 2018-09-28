@@ -57,9 +57,13 @@ def run_epoch():
 
 argmax = lambda x: np.argmax(x, 1)
 
+preprocess_fns = {
+    'sst2': sst2,
+}
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--desc', type=str, default="sst2")
+    parser.add_argument('--dataset', type=str, required=True)
     parser.add_argument('--log_dir', type=str, default='log/')
     parser.add_argument('--save_dir', type=str, default='save/')
     parser.add_argument('--data_dir', type=str, default='data/')
@@ -105,12 +109,12 @@ if __name__ == '__main__':
     submit = args.submit
     n_ctx = args.n_ctx
     save_dir = args.save_dir
-    desc = args.desc
+    desc = args.dataset
     data_dir = args.data_dir
     log_dir = args.log_dir
     submission_dir = args.submission_dir
 
-    dataset = 'sst2'
+    dataset = args.dataset
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     n_gpu = torch.cuda.device_count()
@@ -124,7 +128,7 @@ if __name__ == '__main__':
     print("Encoding dataset...")
     ((trX, trY),
      (vaX, vaY),
-     (teX, teY)) = encode_dataset(*sst2(data_dir), encoder=text_encoder)
+     (teX, teY)) = encode_dataset(*preprocess_fns[dataset](data_dir), encoder=text_encoder)
     encoder['_start_'] = len(encoder)
     encoder['_classify_'] = len(encoder)
     clf_token = encoder['_classify_']
