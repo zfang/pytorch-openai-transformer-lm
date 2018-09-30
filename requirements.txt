@@ -4,3 +4,4 @@ sklearn
 spacy
 ftfy
 pandas
+tensorboardx

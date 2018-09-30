@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 from sklearn.metrics import accuracy_score
 from sklearn.utils import shuffle
+from tensorboardX import SummaryWriter
 
 from analysis import classification
 from datasets import sst2
@@ -16,22 +17,20 @@ from opt import OpenAIAdam
 from text_utils import TextEncoder
 from train import predict, iter_apply, transform_classification
 from utils import (encode_dataset, iter_data,
-                   ResultLogger, make_path)
+                   make_path, ResultLogger)
 
 
 def log(save_dir, desc):
     global best_score
-    print("Logging")
-    tr_logits, tr_cost = iter_apply(trX[:n_valid], trM[:n_valid], trY[:n_valid],
-                                    dh_model, compute_loss_fct, n_batch_train, device)
     va_logits, va_cost = iter_apply(vaX, vaM, vaY,
                                     dh_model, compute_loss_fct, n_batch_train, device)
-    tr_cost = tr_cost / len(trY[:n_valid])
     va_cost = va_cost / n_valid
-    tr_acc = accuracy_score(trY[:n_valid], np.argmax(tr_logits, 1)) * 100.
     va_acc = accuracy_score(vaY, np.argmax(va_logits, 1)) * 100.
-    logger.log(n_epochs=n_epochs, n_updates=n_updates, tr_cost=tr_cost, va_cost=va_cost, tr_acc=tr_acc, va_acc=va_acc)
-    print('%d %d %.3f %.3f %.2f %.2f' % (n_epochs, n_updates, tr_cost, va_cost, tr_acc, va_acc))
+    logger.log(n_epochs=n_epochs, n_updates=n_updates, va_cost=va_cost, va_acc=va_acc)
+    tensorboard_logger.add_scalar(
+        'val_loss', va_cost, n_updates)
+    tensorboard_logger.add_scalar(
+        'val_accuracy', va_acc, n_updates)
     if submit:
         score = va_acc
         if score > best_score:
@@ -49,9 +48,11 @@ def run_epoch():
         YMB = torch.tensor(ymb, dtype=torch.long).to(device)
         MMB = torch.tensor(mmb).to(device)
         lm_logits, clf_logits = dh_model(XMB)
-        compute_loss_fct(XMB, YMB, MMB, clf_logits, lm_logits)
+        train_loss = compute_loss_fct(XMB, YMB, MMB, clf_logits, lm_logits)
         n_updates += 1
-        if n_updates in [1000, 2000, 4000, 8000, 16000, 32000] and n_epochs == 0:
+        tensorboard_logger.add_scalar(
+            'train_loss', train_loss, n_updates)
+        if n_updates % (100 // n_gpu) == 0:
             log(save_dir, desc)
 
 
@@ -120,7 +121,8 @@ if __name__ == '__main__':
     n_gpu = torch.cuda.device_count()
     print("device", device, "n_gpu", n_gpu)
 
-    logger = ResultLogger(path=os.path.join(log_dir, '{}.jsonl'.format(desc)), **args.__dict__)
+    log_file = os.path.join(log_dir, '{}.jsonl'.format(dataset))
+    logger = ResultLogger(path=log_file, **args.__dict__)
     text_encoder = TextEncoder(args.encoder_path, args.bpe_path)
     encoder = text_encoder.encoder
     n_vocab = len(text_encoder.encoder)
@@ -187,6 +189,7 @@ if __name__ == '__main__':
         path = os.path.join(save_dir, desc, 'best_params')
         torch.save(dh_model.state_dict(), make_path(path))
     best_score = 0
+    tensorboard_logger = SummaryWriter(log_dir)
     for i in range(args.n_iter):
         print("running epoch", i)
         run_epoch()
@@ -195,9 +198,10 @@ if __name__ == '__main__':
     if submit:
         path = os.path.join(save_dir, desc, 'best_params')
         dh_model.load_state_dict(torch.load(path))
+        predict_file = '{}.tsv'.format(dataset)
         predict(X=teX,
                 submission_dir=args.submission_dir,
-                filename='{}.tsv'.format(dataset),
+                filename=predict_file,
                 pred_fn=argmax,
                 label_decoder=None,
                 dh_model=dh_model,
@@ -206,5 +210,5 @@ if __name__ == '__main__':
         if args.analysis:
             classification(dataset,
                            teY,
-                           os.path.join(args.submission_dir, '{}.tsv'.format(dataset)),
-                           os.path.join(log_dir, '{}.jsonl'.format(dataset)))
+                           os.path.join(args.submission_dir, predict_file),
+                           log_file)
