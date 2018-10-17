@@ -2,6 +2,7 @@ import csv
 import os
 
 import numpy as np
+import pandas as pd
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
@@ -67,5 +68,15 @@ def sst2(data_dir):
                 texts.append(line[2:])
 
             data.append((texts, np.asarray(labels, dtype=np.int32)))
+
+    return tuple(data)
+
+
+def headerless_tsv(data_dir):
+    data = []
+    for name in ('train', 'dev', 'test'):
+        file_name = os.path.join(data_dir, '{}.tsv'.format(name))
+        df = pd.read_csv(file_name, sep='\t', header=None, names=['text', 'label'], dtype={'text': str, 'label': int})
+        data.append((df['text'].astype('str'), df['label'].values))
 
     return tuple(data)

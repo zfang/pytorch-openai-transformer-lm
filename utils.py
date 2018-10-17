@@ -8,13 +8,13 @@ import numpy as np
 from tqdm import tqdm
 
 
-def encode_dataset(*splits, encoder):
+def encode_dataset(*splits, encoder, **kwargs):
     encoded_splits = []
     for split in splits:
         fields = []
         for field in split:
             if isinstance(field[0], str):
-                field = encoder.encode(field)
+                field = encoder.encode(field, **kwargs)
             fields.append(field)
         encoded_splits.append(fields)
     return encoded_splits

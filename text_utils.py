@@ -1,9 +1,14 @@
 import json
+import os
 import re
 
 import ftfy
 import spacy
 from tqdm import tqdm
+
+PUNC_PATTERN = re.compile(r'''(-+|~+|!+|"+|;+|\?+|\++|,+|\)+|\(+|\\+|\/+|\*+|\[+|\]+|}+|{+|\|+|_+)''')
+SPACE_PATTERN1 = re.compile(r'\s*\n\s*')
+SPACE_PATTERN2 = re.compile(r'[^\S\n]+')
 
 
 def get_pairs(word):
@@ -29,9 +34,9 @@ def text_standardize(text):
     text = text.replace('―', '-')
     text = text.replace('…', '...')
     text = text.replace('´', "'")
-    text = re.sub(r'''(-+|~+|!+|"+|;+|\?+|\++|,+|\)+|\(+|\\+|\/+|\*+|\[+|\]+|}+|{+|\|+|_+)''', r' \1 ', text)
-    text = re.sub(r'\s*\n\s*', ' \n ', text)
-    text = re.sub(r'[^\S\n]+', ' ', text)
+    text = PUNC_PATTERN.sub(r' \1 ', text)
+    text = SPACE_PATTERN1.sub(' \n ', text)
+    text = SPACE_PATTERN2.sub(' ', text)
     return text.strip()
 
 
@@ -92,9 +97,15 @@ class TextEncoder(object):
         self.cache[token] = word
         return word
 
-    def encode(self, texts):
+    def encode(self, texts, skip_preprocess=False):
         texts_tokens = []
-        for text in tqdm(self.nlp.pipe(map(lambda t: text_standardize(ftfy.fix_text(t)), texts)), leave=False):
+        if skip_preprocess:
+            preprocess = lambda x: x
+        else:
+            preprocess = lambda x: text_standardize(ftfy.fix_text(x))
+
+        for text in tqdm(self.nlp.pipe(map(preprocess, texts)),
+                         total=len(texts)):
             text_tokens = []
             for token in text:
                 text_tokens.extend([self.encoder.get(t, 0) for t in self.bpe(token.text.lower()).split(' ')])

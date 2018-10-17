@@ -1,6 +1,7 @@
 import argparse
 import os
 import random
+from collections import defaultdict
 
 import numpy as np
 import torch
@@ -10,7 +11,7 @@ from sklearn.utils import shuffle
 from tensorboardX import SummaryWriter
 
 from analysis import classification
-from datasets import sst2
+from datasets import sst2, headerless_tsv
 from loss import ClassificationLossCompute
 from model_pytorch import DoubleHeadModel, load_openai_pretrained_model
 from opt import OpenAIAdam
@@ -39,7 +40,7 @@ def log(save_dir, desc):
             torch.save(dh_model.state_dict(), make_path(path))
 
 
-def run_epoch():
+def run_epoch(update_internal):
     for xmb, mmb, ymb in iter_data(*shuffle(trX, trM, trY, random_state=np.random),
                                    n_batch=n_batch_train, truncate=True, verbose=True):
         global n_updates
@@ -52,15 +53,13 @@ def run_epoch():
         n_updates += 1
         tensorboard_logger.add_scalar(
             'train_loss', train_loss, n_updates)
-        if n_updates % (100 // n_gpu) == 0:
+        if n_updates % update_internal == 0:
             log(save_dir, desc)
 
 
 argmax = lambda x: np.argmax(x, 1)
 
-preprocess_fns = {
-    'sst2': sst2,
-}
+preprocess_fns = defaultdict(lambda: headerless_tsv, sst2=sst2)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -71,6 +70,8 @@ if __name__ == '__main__':
     parser.add_argument('--submission_dir', type=str, default='submission/')
     parser.add_argument('--submit', action='store_true')
     parser.add_argument('--analysis', action='store_true')
+    parser.add_argument('--skip_preprocess', action='store_true')
+    parser.add_argument('--update_interval', type=int, default=100)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--n_iter', type=int, default=3)
     parser.add_argument('--n_batch', type=int, default=8)
@@ -109,10 +110,10 @@ if __name__ == '__main__':
     # Constants
     submit = args.submit
     n_ctx = args.n_ctx
-    save_dir = args.save_dir
     desc = args.dataset
-    data_dir = args.data_dir
-    log_dir = args.log_dir
+    save_dir = os.path.join(args.save_dir, desc)
+    data_dir = os.path.join(args.data_dir, desc)
+    log_dir = os.path.join(args.log_dir, desc)
     submission_dir = args.submission_dir
 
     dataset = args.dataset
@@ -130,7 +131,9 @@ if __name__ == '__main__':
     print("Encoding dataset...")
     ((trX, trY),
      (vaX, vaY),
-     (teX, teY)) = encode_dataset(*preprocess_fns[dataset](data_dir), encoder=text_encoder)
+     (teX, teY)) = encode_dataset(*preprocess_fns[dataset](data_dir),
+                                  encoder=text_encoder,
+                                  skip_preprocess=args.skip_preprocess)
     encoder['_start_'] = len(encoder)
     encoder['_classify_'] = len(encoder)
     clf_token = encoder['_classify_']
@@ -186,17 +189,17 @@ if __name__ == '__main__':
     n_updates = 0
     n_epochs = 0
     if submit:
-        path = os.path.join(save_dir, desc, 'best_params')
+        path = os.path.join(save_dir, 'best_params')
         torch.save(dh_model.state_dict(), make_path(path))
     best_score = 0
     tensorboard_logger = SummaryWriter(log_dir)
     for i in range(args.n_iter):
         print("running epoch", i)
-        run_epoch()
+        run_epoch(args.update_interval)
         n_epochs += 1
         log(save_dir, desc)
     if submit:
-        path = os.path.join(save_dir, desc, 'best_params')
+        path = os.path.join(save_dir, 'best_params')
         dh_model.load_state_dict(torch.load(path))
         predict_file = '{}.tsv'.format(dataset)
         predict(X=teX,
