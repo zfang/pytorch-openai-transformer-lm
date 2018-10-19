@@ -36,7 +36,7 @@ def log(save_dir, desc):
     score = va_acc
     if score > best_score:
         best_score = score
-        path = os.path.join(save_dir, desc, 'best_params')
+        path = os.path.join(save_dir, 'best_params')
         torch.save(dh_model.state_dict(), make_path(path))
 
 
