@@ -32,12 +32,12 @@ def log(save_dir, desc):
         'val_loss', va_cost, n_updates)
     tensorboard_logger.add_scalar(
         'val_accuracy', va_acc, n_updates)
-    if submit:
-        score = va_acc
-        if score > best_score:
-            best_score = score
-            path = os.path.join(save_dir, desc, 'best_params')
-            torch.save(dh_model.state_dict(), make_path(path))
+
+    score = va_acc
+    if score > best_score:
+        best_score = score
+        path = os.path.join(save_dir, desc, 'best_params')
+        torch.save(dh_model.state_dict(), make_path(path))
 
 
 def run_epoch(update_internal):
@@ -68,8 +68,6 @@ if __name__ == '__main__':
     parser.add_argument('--save_dir', type=str, default='save/')
     parser.add_argument('--data_dir', type=str, default='data/')
     parser.add_argument('--submission_dir', type=str, default='submission/')
-    parser.add_argument('--submit', action='store_true')
-    parser.add_argument('--analysis', action='store_true')
     parser.add_argument('--skip_preprocess', action='store_true')
     parser.add_argument('--update_interval', type=int, default=100)
     parser.add_argument('--seed', type=int, default=42)
@@ -108,7 +106,6 @@ if __name__ == '__main__':
     torch.cuda.manual_seed_all(args.seed)
 
     # Constants
-    submit = args.submit
     n_ctx = args.n_ctx
     desc = args.dataset
     save_dir = os.path.join(args.save_dir, desc)
@@ -152,8 +149,7 @@ if __name__ == '__main__':
 
     trX, trM = transform(trX)
     vaX, vaM = transform(vaX)
-    if submit:
-        teX, teM = transform(teX)
+    teX, teM = transform(teX)
 
     n_class = len(set(trY) | set(vaY) | set(teY))
 
@@ -188,9 +184,9 @@ if __name__ == '__main__':
 
     n_updates = 0
     n_epochs = 0
-    if submit:
-        path = os.path.join(save_dir, 'best_params')
-        torch.save(dh_model.state_dict(), make_path(path))
+    path = os.path.join(save_dir, 'best_params')
+    torch.save(dh_model.state_dict(), make_path(path))
+
     best_score = 0
     tensorboard_logger = SummaryWriter(log_dir)
     for i in range(args.n_iter):
@@ -198,20 +194,19 @@ if __name__ == '__main__':
         run_epoch(args.update_interval)
         n_epochs += 1
         log(save_dir, desc)
-    if submit:
-        path = os.path.join(save_dir, 'best_params')
-        dh_model.load_state_dict(torch.load(path))
-        predict_file = '{}.tsv'.format(dataset)
-        predict(X=teX,
-                submission_dir=args.submission_dir,
-                filename=predict_file,
-                pred_fn=argmax,
-                label_decoder=None,
-                dh_model=dh_model,
-                n_batch_train=n_batch_train,
-                device=device)
-        if args.analysis:
-            classification(dataset,
-                           teY,
-                           os.path.join(args.submission_dir, predict_file),
-                           log_file)
+
+    path = os.path.join(save_dir, 'best_params')
+    dh_model.load_state_dict(torch.load(path))
+    predict_file = '{}.tsv'.format(dataset)
+    predict(X=teX,
+            submission_dir=args.submission_dir,
+            filename=predict_file,
+            pred_fn=argmax,
+            label_decoder=None,
+            dh_model=dh_model,
+            n_batch_train=n_batch_train,
+            device=device)
+    classification(dataset,
+                   teY,
+                   os.path.join(args.submission_dir, predict_file),
+                   log_file)
