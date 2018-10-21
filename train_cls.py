@@ -96,6 +96,7 @@ if __name__ == '__main__':
     parser.add_argument('--b1', type=float, default=0.9)
     parser.add_argument('--b2', type=float, default=0.999)
     parser.add_argument('--e', type=float, default=1e-8)
+    parser.add_argument('--snapshot')
 
     args = parser.parse_args()
     print(args)
@@ -181,6 +182,8 @@ if __name__ == '__main__':
 
     dh_model.to(device)
     dh_model = nn.DataParallel(dh_model)
+    if args.snapshot is not None:
+        dh_model.load_state_dict(torch.load(args.snapshot))
 
     n_updates = 0
     n_epochs = 0
@@ -195,7 +198,6 @@ if __name__ == '__main__':
         n_epochs += 1
         log(save_dir, desc)
 
-    path = os.path.join(save_dir, 'best_params')
     dh_model.load_state_dict(torch.load(path))
     predict_file = '{}.tsv'.format(dataset)
     predict(X=teX,
