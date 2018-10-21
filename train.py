@@ -61,3 +61,4 @@ def predict(X, submission_dir, filename, pred_fn, label_decoder, dh_model, n_bat
         f.write('{}\t{}\n'.format('index', 'prediction'))
         for i, prediction in enumerate(predictions):
             f.write('{}\t{}\n'.format(i, prediction))
+    return predictions

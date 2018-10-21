@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import random
 from collections import defaultdict
@@ -13,7 +14,7 @@ from tensorboardX import SummaryWriter
 from analysis import classification
 from datasets import sst2, headerless_tsv
 from loss import ClassificationLossCompute
-from model_pytorch import DoubleHeadModel, load_openai_pretrained_model
+from model_pytorch import DoubleHeadModel, load_openai_pretrained_model, dotdict
 from opt import OpenAIAdam
 from text_utils import TextEncoder
 from train import predict, iter_apply, transform_classification
@@ -97,6 +98,7 @@ if __name__ == '__main__':
     parser.add_argument('--b2', type=float, default=0.999)
     parser.add_argument('--e', type=float, default=1e-8)
     parser.add_argument('--snapshot')
+    parser.add_argument('--snapshot-mode', choices=['full', 'lm_only'])
 
     args = parser.parse_args()
     print(args)
@@ -154,7 +156,29 @@ if __name__ == '__main__':
 
     n_class = len(set(trY) | set(vaY) | set(teY))
 
-    dh_model = DoubleHeadModel(args, clf_token, ['classification', n_class], vocab, n_ctx)
+    meta = dict(
+        dh_model=dict(
+            cfg=dotdict(dict(
+                n_embd=args.n_embd,
+                n_head=args.n_head,
+                n_layer=args.n_layer,
+                embd_pdrop=args.embd_pdrop,
+                attn_pdrop=args.attn_pdrop,
+                resid_pdrop=args.resid_pdrop,
+                afn=args.afn,
+                clf_pdrop=args.clf_pdrop,
+            )),
+            clf_token=clf_token,
+            task_head_type=['classification', n_class],
+            vocab=vocab,
+            n_ctx=n_ctx,
+        ),
+        encoder=dict(
+            max_len=max_len,
+        ),
+    )
+
+    dh_model = DoubleHeadModel(**meta['dh_model'])
 
     n_train = len(trY)
     n_valid = len(vaY)
@@ -183,10 +207,13 @@ if __name__ == '__main__':
     dh_model.to(device)
     dh_model = nn.DataParallel(dh_model)
     if args.snapshot is not None:
+        if args.snapshot_mode == 'lm_only':
+            raise NotImplementedError()
         dh_model.load_state_dict(torch.load(args.snapshot))
 
     n_updates = 0
     n_epochs = 0
+    json.dump(meta, open(os.path.join(save_dir, 'meta.json'), 'w', encoding='utf8'), indent=4, ensure_ascii=False)
     path = os.path.join(save_dir, 'best_params')
     torch.save(dh_model.state_dict(), make_path(path))
 

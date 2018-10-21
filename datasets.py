@@ -80,3 +80,8 @@ def headerless_tsv(data_dir):
         data.append((df['text'].astype('str'), df['label'].values))
 
     return tuple(data)
+
+
+def load_headerless_tsv(file_name):
+    df = pd.read_csv(file_name, sep='\t', header=None, names=['text', 'label'], dtype={'text': str, 'label': int})
+    return df['text'].astype('str'), df['label'].values
