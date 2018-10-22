@@ -71,7 +71,12 @@ def main():
                           device=device)
 
     df = pd.DataFrame({'text': texts, 'label': labels, 'prediction': predictions})
-    df.to_csv(args.output_file, index=False, sep='\t', header=False, float_format='%.0f')
+    df.to_csv(args.output_file,
+              index=False,
+              sep='\t',
+              header=False,
+              columns=['text', 'label', 'prediction'],
+              float_format='%.0f')
 
     accuracy = accuracy_score(Y, predictions) * 100.
     print('Accuracy: {}%'.format(accuracy))

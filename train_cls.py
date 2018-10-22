@@ -98,7 +98,7 @@ if __name__ == '__main__':
     parser.add_argument('--b2', type=float, default=0.999)
     parser.add_argument('--e', type=float, default=1e-8)
     parser.add_argument('--snapshot')
-    parser.add_argument('--snapshot-mode', choices=['full', 'lm_only'])
+    parser.add_argument('--snapshot-mode', choices=['full', 'lm_only'], default='full')
 
     args = parser.parse_args()
     print(args)
@@ -115,6 +115,9 @@ if __name__ == '__main__':
     data_dir = os.path.join(args.data_dir, desc)
     log_dir = os.path.join(args.log_dir, desc)
     submission_dir = args.submission_dir
+
+    for d in (save_dir, log_dir):
+        os.makedirs(d, exist_ok=True)
 
     dataset = args.dataset
 
