@@ -5,6 +5,7 @@ import time
 from functools import partial
 
 import numpy as np
+from torch import nn
 from tqdm import tqdm
 
 
@@ -99,14 +100,25 @@ def iter_data(*datas, n_batch=128, truncate=False, verbose=False, max_batches=fl
         n = (n // n_batch) * n_batch
     n = min(n, max_batches * n_batch)
     n_batches = 0
-    if verbose:
-        f = sys.stderr
-    else:
-        f = open(os.devnull, 'w')
-    for i in tqdm(range(0, n, n_batch), total=n // n_batch, file=f, dynamic_ncols=True):
+    for i in tqdm(range(0, n, n_batch), total=n // n_batch, leave=verbose, dynamic_ncols=True):
         if n_batches >= max_batches: raise StopIteration
         if len(datas) == 1:
             yield datas[0][i:i + n_batch]
         else:
             yield (d[i:i + n_batch] for d in datas)
         n_batches += 1
+
+
+def enable_dropout_module(m):
+    if isinstance(m, nn.Dropout):
+        m.train()
+
+
+def softmax(z):
+    assert len(z.shape) == 2
+    s = np.max(z, axis=1)
+    s = s[:, np.newaxis]
+    e_x = np.exp(z - s)
+    div = np.sum(e_x, axis=1)
+    div = div[:, np.newaxis]
+    return e_x / div

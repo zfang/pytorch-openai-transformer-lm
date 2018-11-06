@@ -3,7 +3,7 @@ import os
 import numpy as np
 import torch
 
-from utils import iter_data
+from utils import iter_data, enable_dropout_module
 
 
 def transform_classification(X, max_len, start, clf_token, n_vocab, n_special, n_ctx):
@@ -39,11 +39,13 @@ def iter_apply(Xs, Ms, Ys, dh_model, compute_loss_fct, n_batch_train, device):
     return logits, cost
 
 
-def iter_predict(Xs, dh_model, n_batch_train, device):
+def iter_predict(Xs, dh_model, n_batch_train, device, enable_dropout=False):
     logits = []
     with torch.no_grad():
         dh_model.eval()
-        for xmb in iter_data(Xs, n_batch=n_batch_train, truncate=False, verbose=True):
+        if enable_dropout:
+            dh_model.apply(enable_dropout_module)
+        for xmb in iter_data(Xs, n_batch=n_batch_train, truncate=False, verbose=not enable_dropout):
             XMB = torch.tensor(xmb, dtype=torch.long).to(device)
             _, clf_logits = dh_model(XMB)
             logits.append(clf_logits.to("cpu").numpy())
@@ -51,14 +53,15 @@ def iter_predict(Xs, dh_model, n_batch_train, device):
     return logits
 
 
-def predict(X, submission_dir, filename, pred_fn, label_decoder, dh_model, n_batch_train, device):
-    predictions = pred_fn(iter_predict(X, dh_model, n_batch_train, device))
+def predict(X, submission_dir, filename, pred_fn, label_decoder, dh_model, n_batch_train, device, enable_dropout=False):
+    predictions = pred_fn(iter_predict(X, dh_model, n_batch_train, device, enable_dropout))
     if label_decoder is not None:
         predictions = [label_decoder[prediction] for prediction in predictions]
-    path = os.path.join(submission_dir, filename)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, 'w') as f:
-        f.write('{}\t{}\n'.format('index', 'prediction'))
-        for i, prediction in enumerate(predictions):
-            f.write('{}\t{}\n'.format(i, prediction))
+    if submission_dir is not None and filename is not None:
+        path = os.path.join(submission_dir, filename)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w') as f:
+            f.write('{}\t{}\n'.format('index', 'prediction'))
+            for i, prediction in enumerate(predictions):
+                f.write('{}\t{}\n'.format(i, prediction))
     return predictions

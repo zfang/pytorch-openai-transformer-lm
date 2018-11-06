@@ -6,12 +6,13 @@ import numpy as np
 import pandas as pd
 import torch
 from sklearn.metrics import accuracy_score
+from tqdm import tqdm
 
 from datasets import load_headerless_tsv
 from model_pytorch import DoubleHeadModel, dotdict
 from text_utils import TextEncoder
 from train import transform_classification, predict
-from utils import encode_dataset
+from utils import encode_dataset, softmax
 
 
 def main():
@@ -23,6 +24,7 @@ def main():
     parser.add_argument('--encoder_path', type=str, default='model/encoder_bpe_40000.json')
     parser.add_argument('--bpe_path', type=str, default='model/vocab_40000.bpe')
     parser.add_argument('--model_dir', required=True)
+    parser.add_argument('--mc_dropout_iter', type=int, default=0)
     args = parser.parse_args()
 
     meta = json.load(open(os.path.join(args.model_dir, 'meta.json'), 'r', encoding='utf8'))
@@ -61,15 +63,16 @@ def main():
         map_location = None
 
     dh_model.load_state_dict(torch.load(path, map_location=map_location))
-    predictions = predict(X=X,
-                          submission_dir='/tmp',
-                          filename='predictions.tsv',
-                          pred_fn=lambda x: np.argmax(x, 1),
-                          label_decoder=None,
-                          dh_model=dh_model,
-                          n_batch_train=n_batch_train,
-                          device=device)
+    prediction_output = predict(X=X,
+                                submission_dir=None,
+                                filename=None,
+                                pred_fn=lambda x: x,
+                                label_decoder=None,
+                                dh_model=dh_model,
+                                n_batch_train=n_batch_train,
+                                device=device)
 
+    predictions = np.argmax(prediction_output, axis=1)
     df = pd.DataFrame({'text': texts, 'label': labels, 'prediction': predictions})
     df.to_csv(args.output_file,
               index=False,
@@ -80,6 +83,42 @@ def main():
 
     accuracy = accuracy_score(Y, predictions) * 100.
     print('Accuracy: {}%'.format(accuracy))
+
+    basename = os.path.splitext(args.output_file)[0]
+
+    prediction_output_file = basename + '_output.npy'
+    np.savetxt(prediction_output_file, prediction_output)
+    prediction_probs = softmax(prediction_output)
+    prediction_probs_file = basename + '_probs.npy'
+    np.savetxt(prediction_probs_file, prediction_probs)
+
+    mc_dropout_prediction_output = []
+    for _ in tqdm(range(args.mc_dropout_iter)):
+        prediction_output = predict(X=X,
+                                    submission_dir=None,
+                                    filename=None,
+                                    pred_fn=lambda x: x,
+                                    label_decoder=None,
+                                    dh_model=dh_model,
+                                    n_batch_train=n_batch_train,
+                                    device=device,
+                                    enable_dropout=True)
+        mc_dropout_prediction_output.append(prediction_output)
+
+    if mc_dropout_prediction_output:
+        mc_dropout_prediction_output = np.asarray(mc_dropout_prediction_output)
+        mc_dropout_prediction_probs = np.zeros(mc_dropout_prediction_output.shape)
+        for i in range(mc_dropout_prediction_output.shape[0]):
+            mc_dropout_prediction_probs[i, ...] = softmax(mc_dropout_prediction_output[i, ...])
+
+        transpose_dims = (2, 1, 0)
+        mc_dropout_prediction_output = mc_dropout_prediction_output.transpose(transpose_dims)
+        mc_dropout_prediction_probs = mc_dropout_prediction_probs.transpose(transpose_dims)
+        for i in range(mc_dropout_prediction_output.shape[0]):
+            prediction_output_file = '{}_class{}_{}'.format(basename, i, 'output.npy')
+            np.savetxt(prediction_output_file, mc_dropout_prediction_output[i, ...])
+            prediction_probs_file = '{}_class{}_{}'.format(basename, i, 'probs.npy')
+            np.savetxt(prediction_probs_file, mc_dropout_prediction_probs[i, ...])
 
 
 if __name__ == '__main__':
