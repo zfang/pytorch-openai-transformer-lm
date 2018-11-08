@@ -71,6 +71,7 @@ if __name__ == '__main__':
     parser.add_argument('--submission_dir', type=str, default='submission/')
     parser.add_argument('--skip_preprocess', action='store_true')
     parser.add_argument('--update_interval', type=int, default=100)
+    parser.add_argument('--force_max_ctx', action='store_true')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--n_iter', type=int, default=3)
     parser.add_argument('--n_batch', type=int, default=8)
@@ -97,8 +98,8 @@ if __name__ == '__main__':
     parser.add_argument('--b1', type=float, default=0.9)
     parser.add_argument('--b2', type=float, default=0.999)
     parser.add_argument('--e', type=float, default=1e-8)
-    parser.add_argument('--snapshot')
-    parser.add_argument('--snapshot-mode', choices=['full', 'lm_only'], default='full')
+    parser.add_argument('--snapshot_dir')
+    parser.add_argument('--snapshot_mode', choices=['full', 'transformer_only'], default='full')
 
     args = parser.parse_args()
     print(args)
@@ -142,9 +143,16 @@ if __name__ == '__main__':
     clf_token = encoder['_classify_']
     n_special = 2
     max_len = n_ctx - n_special
-    n_ctx = min(max([len(x[:max_len]) for x in trX] +
-                    [len(x[:max_len]) for x in vaX] +
-                    [len(x[:max_len]) for x in teX]) + n_special, n_ctx)
+    if not args.force_max_ctx:
+        n_ctx = min(max([len(x[:max_len]) for x in trX] +
+                        [len(x[:max_len]) for x in vaX] +
+                        [len(x[:max_len]) for x in teX]) + n_special, n_ctx)
+
+    if args.snapshot_dir is not None:
+        snapshot_meta = json.load(open(os.path.join(args.snapshot_dir, 'meta.json'), 'r', encoding='utf8'))
+        n_ctx = snapshot_meta['dh_model']['n_ctx']
+        max_len = snapshot_meta['encoder']['max_len']
+
     vocab = n_vocab + n_special + n_ctx
 
 
@@ -182,6 +190,20 @@ if __name__ == '__main__':
     )
 
     dh_model = DoubleHeadModel(**meta['dh_model'])
+    if args.snapshot_dir is not None:
+        dh_model.to(device)
+        dh_model = nn.DataParallel(dh_model)
+        print("Loading snapshot...")
+        snapshot_dict = torch.load(os.path.join(args.snapshot_dir, 'best_params'))
+        if args.snapshot_mode == 'transformer_only':
+            model_dict = dh_model.state_dict()
+            model_dict.update({k: v for k, v in snapshot_dict.items() if 'task_head' not in k})
+            snapshot_dict = model_dict
+        dh_model.load_state_dict(snapshot_dict)
+    else:
+        load_openai_pretrained_model(dh_model.transformer, n_ctx=n_ctx, n_special=n_special, n_transfer=args.n_transfer)
+        dh_model.to(device)
+        dh_model = nn.DataParallel(dh_model)
 
     n_train = len(trY)
     n_valid = len(vaY)
@@ -205,14 +227,6 @@ if __name__ == '__main__':
                                                  criterion,
                                                  args.lm_coef,
                                                  model_opt)
-    load_openai_pretrained_model(dh_model.transformer, n_ctx=n_ctx, n_special=n_special, n_transfer=args.n_transfer)
-
-    dh_model.to(device)
-    dh_model = nn.DataParallel(dh_model)
-    if args.snapshot is not None:
-        if args.snapshot_mode == 'lm_only':
-            raise NotImplementedError()
-        dh_model.load_state_dict(torch.load(args.snapshot))
 
     n_updates = 0
     n_epochs = 0
