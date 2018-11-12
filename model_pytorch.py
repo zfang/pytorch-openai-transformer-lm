@@ -3,6 +3,7 @@ import copy
 import json
 import math
 import re
+from collections import deque
 
 import numpy as np
 import torch
@@ -159,14 +160,26 @@ class TransformerModel(nn.Module):
         self.decoder = nn.Linear(cfg.n_embd, vocab, bias=False)
         self.decoder.weight = self.embed.weight  # Tied weights
 
+        self.skip_connections = cfg.skip_connections
+        if cfg.n_layer > 2 and self.skip_connections:
+            self.ln = nn.ModuleList([LayerNorm(n_ctx) for _ in range(cfg.n_layer - 2)])
+        else:
+            self.ln = None
+
         nn.init.normal_(self.embed.weight, std=0.02)
 
     def forward(self, x):
         x = x.view(-1, x.size(-2), x.size(-1))
         e = self.embed(x)
         h = e.sum(dim=2)
-        for block in self.h:
-            h = block(h)
+        if self.skip_connections:
+            h_q = deque(maxlen=2)
+            for i, block in enumerate(self.h):
+                h_q.append(h)
+                h = block(h if len(h_q) < 2 else self.ln[i - 2](sum(h_q)))
+        else:
+            for block in self.h:
+                h = block(h)
         return h
 
 

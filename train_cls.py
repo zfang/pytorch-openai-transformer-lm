@@ -99,6 +99,7 @@ if __name__ == '__main__':
     parser.add_argument('--b1', type=float, default=0.9)
     parser.add_argument('--b2', type=float, default=0.999)
     parser.add_argument('--e', type=float, default=1e-8)
+    parser.add_argument('--skip_connections', action='store_true')
     parser.add_argument('--snapshot_dir')
     parser.add_argument('--snapshot_mode', choices=['full', 'transformer_only'], default='full')
 
