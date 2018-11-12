@@ -6,12 +6,20 @@ import torch
 from utils import iter_data, enable_dropout_module
 
 
-def transform_classification(X, max_len, start, clf_token, n_vocab, n_special, n_ctx):
-    n_batch = len(X)
+def transform_classification(X, max_len, start, clf_token, n_vocab, n_special, n_ctx, delimiter=None):
+    assert (type(X) is tuple) == (delimiter is not None)
+    if delimiter is not None:
+        n_batch = len(X[0])
+        X = zip(*X)
+    else:
+        n_batch = len(X)
     xmb = np.zeros((n_batch, n_ctx, 2), dtype=np.int32)
     mmb = np.zeros((n_batch, n_ctx), dtype=np.float32)
     for i, x in enumerate(X):
-        x_input = [start] + x[:max_len] + [clf_token]
+        if delimiter is not None:
+            x_input = [start] + x[0][:max_len] + [delimiter] + x[1][:max_len] + [clf_token]
+        else:
+            x_input = [start] + x[:max_len] + [clf_token]
         l = len(x_input)
         xmb[i, :l, 0] = x_input
         mmb[i, :l] = 1

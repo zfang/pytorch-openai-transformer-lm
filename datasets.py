@@ -56,7 +56,8 @@ def rocstories(data_dir, n_train=1497, n_valid=374):
     return (trX1, trX2, trX3, trY), (vaX1, vaX2, vaX3, vaY), (teX1, teX2, teX3)
 
 
-def sst2(data_dir):
+def sst2(data_dir, sentence_pair=False):
+    assert not sentence_pair
     data = []
     for name in ('train', 'dev', 'test'):
         file_name = os.path.join(data_dir, 'stsa.binary.{}'.format(name))
@@ -72,16 +73,40 @@ def sst2(data_dir):
     return tuple(data)
 
 
-def headerless_tsv(data_dir):
+def headerless_tsv(data_dir, sentence_pair=False):
     data = []
     for name in ('train', 'dev', 'test'):
         file_name = os.path.join(data_dir, '{}.tsv'.format(name))
-        df = pd.read_csv(file_name, sep='\t', header=None, names=['text', 'label'], dtype={'text': str, 'label': int})
-        data.append((df['text'].astype('str'), df['label'].values))
+        if sentence_pair:
+            df = pd.read_csv(file_name,
+                             sep='\t',
+                             header=None,
+                             names=['sent1', 'sent2', 'label'],
+                             dtype={'sent1': str, 'sent2': str, 'label': int})
+            data.append(((df['sent1'].astype('str'), df['sent2'].astype('str')), df['label'].values))
+        else:
+            df = pd.read_csv(file_name,
+                             sep='\t',
+                             header=None,
+                             names=['text', 'label'],
+                             dtype={'text': str, 'label': int})
+            data.append((df['text'].astype('str'), df['label'].values))
 
     return tuple(data)
 
 
-def load_headerless_tsv(file_name):
-    df = pd.read_csv(file_name, sep='\t', header=None, names=['text', 'label'], dtype={'text': str, 'label': int})
-    return df['text'].astype('str'), df['label'].values
+def load_headerless_tsv(file_name, sentence_pair=False):
+    if sentence_pair:
+        df = pd.read_csv(file_name,
+                         sep='\t',
+                         header=None,
+                         names=['sent1', 'sent2', 'label'],
+                         dtype={'sent1': str, 'sent2': str, 'label': int})
+        return (df['sent1'].astype('str'), df['sent2'].astype('str')), df['label'].values
+    else:
+        df = pd.read_csv(file_name,
+                         sep='\t',
+                         header=None,
+                         names=['text', 'label'],
+                         dtype={'text': str, 'label': int})
+        return df['text'].astype('str'), df['label'].values

@@ -1,6 +1,5 @@
 import json
 import os
-import sys
 import time
 from functools import partial
 
@@ -14,7 +13,9 @@ def encode_dataset(*splits, encoder, **kwargs):
     for split in splits:
         fields = []
         for field in split:
-            if isinstance(field[0], str):
+            if isinstance(field, tuple):
+                field = tuple(encoder.encode(f, **kwargs) if isinstance(f[0], str) else f for f in field)
+            elif isinstance(field[0], str):
                 field = encoder.encode(field, **kwargs)
             fields.append(field)
         encoded_splits.append(fields)

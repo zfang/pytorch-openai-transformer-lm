@@ -72,6 +72,7 @@ if __name__ == '__main__':
     parser.add_argument('--skip_preprocess', action='store_true')
     parser.add_argument('--update_interval', type=int, default=100)
     parser.add_argument('--force_max_ctx', action='store_true')
+    parser.add_argument('--sentence_pair', action='store_true')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--n_iter', type=int, default=3)
     parser.add_argument('--n_batch', type=int, default=8)
@@ -135,18 +136,21 @@ if __name__ == '__main__':
     print("Encoding dataset...")
     ((trX, trY),
      (vaX, vaY),
-     (teX, teY)) = encode_dataset(*preprocess_fns[dataset](data_dir),
+     (teX, teY)) = encode_dataset(*preprocess_fns[dataset](data_dir, sentence_pair=args.sentence_pair),
                                   encoder=text_encoder,
                                   skip_preprocess=args.skip_preprocess)
     encoder['_start_'] = len(encoder)
+    if args.sentence_pair:
+        encoder['_delimiter_'] = len(encoder)
     encoder['_classify_'] = len(encoder)
     clf_token = encoder['_classify_']
-    n_special = 2
+    n_special = 2 + int('_delimiter_' in encoder)
     max_len = n_ctx - n_special
     if not args.force_max_ctx:
-        n_ctx = min(max([len(x[:max_len]) for x in trX] +
-                        [len(x[:max_len]) for x in vaX] +
-                        [len(x[:max_len]) for x in teX]) + n_special, n_ctx)
+        if args.sentence_pair:
+            n_ctx = min(max([len(x[:max_len]) for X in (trX, vaX, teX) for x_ in X for x in x_]) + n_special, n_ctx)
+        else:
+            n_ctx = min(max([len(x[:max_len]) for X in (trX, vaX, teX) for x in X]) + n_special, n_ctx)
 
     if args.snapshot_dir is not None:
         snapshot_meta = json.load(open(os.path.join(args.snapshot_dir, 'meta.json'), 'r', encoding='utf8'))
@@ -158,7 +162,7 @@ if __name__ == '__main__':
 
     def transform(X):
         return transform_classification(X, max_len, encoder['_start_'], clf_token,
-                                        n_vocab, n_special, n_ctx)
+                                        n_vocab, n_special, n_ctx, encoder.get('_delimiter_'))
 
 
     trX, trM = transform(trX)
