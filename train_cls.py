@@ -146,7 +146,10 @@ if __name__ == '__main__':
     encoder['_classify_'] = len(encoder)
     clf_token = encoder['_classify_']
     n_special = 2 + int('_delimiter_' in encoder)
-    max_len = n_ctx - n_special
+    if args.sentence_pair:
+        max_len = n_ctx // 2 - 2
+    else:
+        max_len = n_ctx - n_special
     if not args.force_max_ctx:
         if args.sentence_pair:
             n_ctx = min(sum(max(len(x[:max_len]) for x_ in X for x in x_) for X in (trX, vaX, teX)) + n_special,
