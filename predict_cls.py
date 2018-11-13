@@ -57,7 +57,7 @@ def main():
     dh_model.to(device)
     dh_model = torch.nn.DataParallel(dh_model)
     path = os.path.join(args.model_dir, 'best_params')
-    if device == 'cpu':
+    if device == torch.device('cpu'):
         map_location = lambda storage, loc: storage
     else:
         map_location = None
