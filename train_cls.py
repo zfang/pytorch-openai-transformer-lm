@@ -149,7 +149,8 @@ if __name__ == '__main__':
     max_len = n_ctx - n_special
     if not args.force_max_ctx:
         if args.sentence_pair:
-            n_ctx = min(max([len(x[:max_len]) for X in (trX, vaX, teX) for x_ in X for x in x_]) + n_special, n_ctx)
+            n_ctx = min(sum(max(len(x[:max_len]) for x_ in X for x in x_) for X in (trX, vaX, teX)) + n_special,
+                        n_ctx)
         else:
             n_ctx = min(max([len(x[:max_len]) for X in (trX, vaX, teX) for x in X]) + n_special, n_ctx)
 
