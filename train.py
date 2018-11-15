@@ -15,7 +15,7 @@ def transform_classification(X, max_len, start, clf_token, n_vocab, n_special, n
     xmb = np.zeros((n_batch, n_ctx, 2), dtype=np.int32)
     mmb = np.zeros((n_batch, n_ctx), dtype=np.float32)
     for i, x in enumerate(X):
-        if type(X) is tuple:
+        if type(x) is tuple:
             x_input = [start] + x[0][:max_len] + [delimiter] + x[1][:max_len] + [clf_token]
         elif delimiter is not None:
             x_input = [start, delimiter] + x[:max_len] + [clf_token]
