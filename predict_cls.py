@@ -21,6 +21,8 @@ def main():
     parser.add_argument('-o', '--output_file', required=True)
     parser.add_argument('--n_batch', type=int, default=8)
     parser.add_argument('--skip_preprocess', action='store_true')
+    parser.add_argument('--sentence_pair', action='store_true')
+    parser.add_argument('--force_delimiter', action='store_true')
     parser.add_argument('--encoder_path', type=str, default='model/encoder_bpe_40000.json')
     parser.add_argument('--bpe_path', type=str, default='model/vocab_40000.bpe')
     parser.add_argument('--model_dir', required=True)
@@ -34,19 +36,21 @@ def main():
     n_vocab = len(text_encoder.encoder)
 
     encoder['_start_'] = len(encoder)
+    if args.sentence_pair or args.force_delimiter:
+        encoder['_delimiter_'] = len(encoder)
     encoder['_classify_'] = len(encoder)
     clf_token = encoder['_classify_']
     n_ctx = meta['dh_model']['n_ctx']
     max_len = meta['encoder']['max_len']
     n_special = 2
 
-    texts, labels = load_headerless_tsv(args.input_file)
+    texts, labels = load_headerless_tsv(args.input_file, sentence_pair=args.sentence_pair)
     ((X, Y),) = encode_dataset(*[(texts, labels)],
                                encoder=text_encoder,
                                skip_preprocess=args.skip_preprocess)
 
     X, M = transform_classification(X, max_len, encoder['_start_'], clf_token,
-                                    n_vocab, n_special, n_ctx)
+                                    n_vocab, n_special, n_ctx, encoder.get('_delimiter_'))
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     n_gpu = torch.cuda.device_count()
@@ -73,7 +77,10 @@ def main():
                                 device=device)
 
     predictions = np.argmax(prediction_output, axis=1)
-    df = pd.DataFrame({'text': texts, 'label': labels, 'prediction': predictions})
+    if type(texts) is tuple:
+        df = pd.DataFrame({'question': texts[0], 'text': texts[1], 'label': labels, 'prediction': predictions})
+    else:
+        df = pd.DataFrame({'text': texts, 'label': labels, 'prediction': predictions})
     df.to_csv(args.output_file,
               index=False,
               sep='\t',

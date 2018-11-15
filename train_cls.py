@@ -72,6 +72,7 @@ if __name__ == '__main__':
     parser.add_argument('--skip_preprocess', action='store_true')
     parser.add_argument('--update_interval', type=int, default=100)
     parser.add_argument('--force_max_ctx', action='store_true')
+    parser.add_argument('--force_delimiter', action='store_true')
     parser.add_argument('--sentence_pair', action='store_true')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--n_iter', type=int, default=3)
@@ -104,7 +105,6 @@ if __name__ == '__main__':
     parser.add_argument('--snapshot_mode', choices=['full', 'transformer_only'], default='full')
 
     args = parser.parse_args()
-    print(args)
 
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -141,7 +141,7 @@ if __name__ == '__main__':
                                   encoder=text_encoder,
                                   skip_preprocess=args.skip_preprocess)
     encoder['_start_'] = len(encoder)
-    if args.sentence_pair:
+    if args.sentence_pair or args.force_delimiter:
         encoder['_delimiter_'] = len(encoder)
     encoder['_classify_'] = len(encoder)
     clf_token = encoder['_classify_']
@@ -160,7 +160,7 @@ if __name__ == '__main__':
     if args.snapshot_dir is not None:
         snapshot_meta = json.load(open(os.path.join(args.snapshot_dir, 'meta.json'), 'r', encoding='utf8'))
         n_ctx = snapshot_meta['dh_model']['n_ctx']
-        max_len = snapshot_meta['encoder']['max_len']
+        max_len = min(snapshot_meta['encoder']['max_len'], max_len)
 
     vocab = n_vocab + n_special + n_ctx
 
@@ -197,6 +197,7 @@ if __name__ == '__main__':
             max_len=max_len,
         ),
     )
+    print(meta)
 
     dh_model = DoubleHeadModel(**meta['dh_model'])
     if args.snapshot_dir is not None:

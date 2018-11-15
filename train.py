@@ -7,8 +7,7 @@ from utils import iter_data, enable_dropout_module
 
 
 def transform_classification(X, max_len, start, clf_token, n_vocab, n_special, n_ctx, delimiter=None):
-    assert (type(X) is tuple) == (delimiter is not None)
-    if delimiter is not None:
+    if type(X) is tuple:
         n_batch = len(X[0])
         X = zip(*X)
     else:
@@ -16,8 +15,10 @@ def transform_classification(X, max_len, start, clf_token, n_vocab, n_special, n
     xmb = np.zeros((n_batch, n_ctx, 2), dtype=np.int32)
     mmb = np.zeros((n_batch, n_ctx), dtype=np.float32)
     for i, x in enumerate(X):
-        if delimiter is not None:
+        if type(X) is tuple:
             x_input = [start] + x[0][:max_len] + [delimiter] + x[1][:max_len] + [clf_token]
+        elif delimiter is not None:
+            x_input = [start, delimiter] + x[:max_len] + [clf_token]
         else:
             x_input = [start] + x[:max_len] + [clf_token]
         l = len(x_input)
