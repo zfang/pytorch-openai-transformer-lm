@@ -40,9 +40,11 @@ def main():
         encoder['_delimiter_'] = len(encoder)
     encoder['_classify_'] = len(encoder)
     clf_token = encoder['_classify_']
+    n_special = 2 + int('_delimiter_' in encoder)
     n_ctx = meta['dh_model']['n_ctx']
     max_len = meta['encoder']['max_len']
-    n_special = 2
+    if args.sentence_pair:
+        max_len = min(max_len, n_ctx // 2 - 2)
 
     texts, labels = load_headerless_tsv(args.input_file, sentence_pair=args.sentence_pair)
     ((X, Y),) = encode_dataset(*[(texts, labels)],
