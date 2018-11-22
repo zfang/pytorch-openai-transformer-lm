@@ -162,7 +162,7 @@ class TransformerModel(nn.Module):
 
         self.skip_connections = cfg.skip_connections
         if cfg.n_layer > 2 and self.skip_connections:
-            self.ln = nn.ModuleList([LayerNorm(n_ctx) for _ in range(cfg.n_layer - 2)])
+            self.ln = nn.ModuleList([LayerNorm(cfg.n_embd) for _ in range(cfg.n_layer // 2)])
         else:
             self.ln = None
 
@@ -176,7 +176,9 @@ class TransformerModel(nn.Module):
             h_q = deque(maxlen=2)
             for i, block in enumerate(self.h):
                 h_q.append(h)
-                h = block(h if len(h_q) < 2 else self.ln[i - 2](sum(h_q)))
+                h = block(h_q[-1])
+                if i % 2 == 1:
+                    h = self.ln[i // 2](h + h_q[0])
         else:
             for block in self.h:
                 h = block(h)
