@@ -187,6 +187,7 @@ if __name__ == '__main__':
                 resid_pdrop=args.resid_pdrop,
                 afn=args.afn,
                 clf_pdrop=args.clf_pdrop,
+                skip_connections=args.skip_connections,
             )),
             clf_token=clf_token,
             task_head_type=['classification', n_class],
