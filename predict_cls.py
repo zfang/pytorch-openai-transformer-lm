@@ -12,7 +12,7 @@ from datasets import load_headerless_tsv
 from model_pytorch import DoubleHeadModel, dotdict
 from text_utils import TextEncoder
 from train import transform_classification, predict
-from utils import encode_dataset, softmax
+from utils import encode_dataset, np_softmax
 
 
 def main():
@@ -97,7 +97,7 @@ def main():
 
     prediction_output_file = basename + '_output.npy'
     np.savetxt(prediction_output_file, prediction_output)
-    prediction_probs = softmax(prediction_output)
+    prediction_probs = np_softmax(prediction_output)
     prediction_probs_file = basename + '_probs.npy'
     np.savetxt(prediction_probs_file, prediction_probs)
 
@@ -118,7 +118,7 @@ def main():
         mc_dropout_prediction_output = np.asarray(mc_dropout_prediction_output)
         mc_dropout_prediction_probs = np.zeros(mc_dropout_prediction_output.shape)
         for i in range(mc_dropout_prediction_output.shape[0]):
-            mc_dropout_prediction_probs[i, ...] = softmax(mc_dropout_prediction_output[i, ...])
+            mc_dropout_prediction_probs[i, ...] = np_softmax(mc_dropout_prediction_output[i, ...])
 
         transpose_dims = (2, 1, 0)
         mc_dropout_prediction_output = mc_dropout_prediction_output.transpose(transpose_dims)

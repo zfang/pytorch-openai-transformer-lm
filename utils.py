@@ -113,13 +113,3 @@ def iter_data(*datas, n_batch=128, truncate=False, verbose=False, max_batches=fl
 def enable_dropout_module(m):
     if isinstance(m, nn.Dropout):
         m.train()
-
-
-def softmax(z):
-    assert len(z.shape) == 2
-    s = np.max(z, axis=1)
-    s = s[:, np.newaxis]
-    e_x = np.exp(z - s)
-    div = np.sum(e_x, axis=1)
-    div = div[:, np.newaxis]
-    return e_x / div
